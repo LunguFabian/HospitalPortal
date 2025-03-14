@@ -1,0 +1,320 @@
+﻿@page "/patient-profile-edit/{patientId:int}"
+@using HospitalPortal.WEB.Services
+@using HospitalPortal.WEB.Models
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IPatientService PatientService
+@inject NavigationManager Navigation
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+@inject NotificationService NotificationService
+
+<PageTitle>Edit Profile</PageTitle>
+
+<AuthorizeView Roles="Patient" Context="authContext">
+    <Authorized>
+        <div class="profile-container">
+            @if (patientId != Id)
+            {
+                <div class="no-access">
+                    <p>You don't have access to this page.</p>
+                </div>
+            }
+            else
+            {
+                <header class="profile-header">
+                    <h1>Edit My Profile</h1>
+                </header>
+                <main class="profile-content">
+                    <div class="profile-card">
+                        <EditForm Model="@editModel" OnValidSubmit="HandleValidSubmit">
+                            <DataAnnotationsValidator />
+                            <ValidationSummary />
+
+                            <div class="form-group">
+                                <label for="firstName">First Name:</label>
+                                <InputText id="firstName" @bind-Value="editModel.FirstName" class="form-control" />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="lastName">Last Name:</label>
+                                <InputText id="lastName" @bind-Value="editModel.LastName" class="form-control" />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="email">Email:</label>
+                                <InputText id="email" @bind-Value="editModel.Email" class="form-control" />
+                            </div>
+
+                            <h3>Change Password</h3>
+                            <div class="form-group">
+                                <label for="currentPassword">Current Password:</label>
+                                <InputText type="password" id="currentPassword" @bind-Value="editModel.CurrentPassword" class="form-control" />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="newPassword">New Password:</label>
+                                <InputText type="password" id="newPassword" @bind-Value="editModel.NewPassword" class="form-control" />
+                            </div>
+
+                            <div class="form-group">
+                                <label for="confirmPassword">Confirm New Password:</label>
+                                <InputText type="password" id="confirmPassword" @bind-Value="editModel.ConfirmPassword" class="form-control" />
+                            </div>
+
+                            <div class="profile-actions">
+                                <button type="submit" class="btn btn-primary">
+                                    <span class="icon">💾</span> Save Changes
+                                </button>
+                                <button type="button" class="btn btn-secondary" @onclick="CancelEdit">
+                                    <span class="icon">❌</span> Cancel
+                                </button>
+                            </div>
+                        </EditForm>
+                    </div>
+                </main>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="no-access">
+            <p>You are not logged in.</p>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [Parameter] public int patientId { get; set; }
+    public PatientDto? patient;
+    public int Id;
+    private EditProfileModel editModel = new EditProfileModel();
+
+    [CascadingParameter] private Task<AuthenticationState> AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthState;
+        if (authState.User.Identity.IsAuthenticated)
+        {
+            var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+            {
+                Id = userId;
+            }
+        }
+        if (Id == patientId)
+        {
+            patient = await PatientService.GetPatientByIdAsync(patientId);
+            editModel.FirstName = patient.FirstName;
+            editModel.LastName = patient.LastName;
+            editModel.Email = patient.Email;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            var profileUpdateDto = new PatientUpdate
+                {
+                    FirstName = editModel.FirstName,
+                    LastName = editModel.LastName,
+                    Email = editModel.Email
+                };
+            await PatientService.UpdatePatientAsync(patientId, profileUpdateDto);
+
+            bool passwordChanged = false;
+
+            if (!string.IsNullOrEmpty(editModel.CurrentPassword))
+            {
+                if (string.IsNullOrEmpty(editModel.NewPassword))
+                {
+                    ShowNotification("New password cannot be empty", NotificationSeverity.Error);
+                    return;
+                }
+
+                if (editModel.NewPassword == editModel.ConfirmPassword)
+                {
+                    var passwordChangeDto = new PasswordChange
+                        {
+                            CurrentPassword = editModel.CurrentPassword,
+                            NewPassword = editModel.NewPassword
+                        };
+
+                    var result = await PatientService.ChangePasswordAsync(patientId, passwordChangeDto);
+                    passwordChanged = result;
+                    if (result == false)
+                    {
+                        ShowNotification("Current password is incorrect", NotificationSeverity.Error);
+                        return;
+                    }
+                }
+                else
+                {
+                    ShowNotification("New password and confirmation do not match", NotificationSeverity.Error);
+                    return;
+                }
+            }
+            else if (!string.IsNullOrEmpty(editModel.NewPassword) || !string.IsNullOrEmpty(editModel.ConfirmPassword))
+            {
+                ShowNotification("Please input the current password", NotificationSeverity.Error);
+                return;
+            }
+
+            if (passwordChanged)
+            {
+                ShowNotification("Profile updated and password changed successfully", NotificationSeverity.Success);
+            }
+            else
+            {
+                ShowNotification("Profile updated successfully", NotificationSeverity.Success);
+            }
+            Navigation.NavigateTo($"/patient-profile/{patientId}");
+        }
+        catch (Exception ex)
+        {
+            ShowNotification($"An error occurred: {ex.Message}", NotificationSeverity.Error);
+        }
+    }
+
+    private void CancelEdit()
+    {
+        Navigation.NavigateTo($"/patient-profile/{patientId}");
+    }
+
+    private void ShowNotification(string message, NotificationSeverity severity)
+    {
+        NotificationService.Notify(new NotificationMessage
+            {
+                Severity = severity,
+                Summary = severity.ToString(),
+                Detail = message,
+                Duration = 4000
+            });
+    }
+}
+
+<style>
+    .no-access {
+        text-align: center;
+        font-size: 24px;
+        color: #ff4d4d;
+        margin-top: 20px;
+        font-weight: bold;
+    }
+
+    .profile-container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+        font-family: Arial, sans-serif;
+        color: #333;
+    }
+
+    .profile-header {
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+
+        .profile-header h1 {
+            color: #4A90E2;
+            font-size: 2rem;
+        }
+
+    .loading-spinner {
+        text-align: center;
+        font-size: 1.2rem;
+        color: #666;
+    }
+
+    .profile-card {
+        background-color: #f9f9f9;
+        border-radius: 8px;
+        padding: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+    }
+
+    .profile-avatar {
+        width: 100px;
+        height: 100px;
+        background-color: #4A90E2;
+        color: white;
+        font-size: 2.5rem;
+        font-weight: bold;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        margin: 0 auto 1rem;
+    }
+
+    .profile-details h2 {
+        color: #4A90E2;
+        margin-bottom: 1rem;
+    }
+
+    .profile-details p {
+        margin-bottom: 0.5rem;
+    }
+
+    .profile-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.8rem 1.5rem;
+        font-size: 1rem;
+        font-weight: bold;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        border: none;
+        width: 100%;
+    }
+
+    .btn-primary {
+        background-color: #4A90E2;
+        color: white;
+    }
+
+        .btn-primary:hover {
+            background-color: #3570B2;
+        }
+
+    .btn-secondary {
+        background-color: #f0f0f0;
+        color: #333;
+    }
+
+        .btn-secondary:hover {
+            background-color: #e0e0e0;
+        }
+
+    .icon {
+        margin-right: 0.5rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-control {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+
+    h3 {
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        color: #4A90E2;
+    }
+</style>

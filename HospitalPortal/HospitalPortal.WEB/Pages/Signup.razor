@@ -1,0 +1,74 @@
+﻿@page "/signup"
+@layout SignupLayout
+@using HospitalPortal.WEB.Models
+@using HospitalPortal.WEB.Services
+@inject IPatientService PatientService
+@inject NavigationManager Navigation
+
+<PageTitle>Register</PageTitle>
+
+
+<EditForm Model="@createModel" OnValidSubmit="HandleLogin">
+	<DataAnnotationsValidator />
+	<ValidationSummary />
+
+	<div class="signup-container">
+		<h2 class="text-center mb-4" style="font-weight: bold;">Sign-Up</h2>
+
+		<div class="form-group">
+			<label class="form-label">First Name:</label>
+			<InputText id="firstName" class="form-control" @bind-Value="@createModel.FirstName" />
+		</div>
+
+		<div class="form-group">
+			<label class="form-label">Last Name:</label>
+			<InputText id="lastName" class="form-control" @bind-Value="@createModel.LastName" />
+		</div>
+
+		<div class="form-group">
+			<label class="form-label">CNP</label>
+			<InputText id="CNP" class="form-control" @bind-Value="@createModel.CNP" />
+		</div>
+
+		<div class="form-group">
+			<label class="form-label">E-mail</label>
+			<InputText id="email" class="form-control" @bind-Value="@createModel.Email" />
+		</div>
+
+		<div class="form-group">
+			<label class="form-label">Password</label>
+			<InputText id="password" type="password" class="form-control" @bind-Value="@createModel.Password" />
+		</div>
+
+		<div class="button-container">
+			<button type="submit" class="btn btn-primary btn-custom">Register</button>
+		</div>
+
+		<div class="text-center mt-4">
+			<p>Already have an account? <a href="/login" class="btn btn-link">Log-In</a></p>
+		</div>
+	</div>
+</EditForm>
+@if (!string.IsNullOrEmpty(errorMessage))
+{
+	<p class="text-danger">@errorMessage</p>
+}
+
+@code {
+	private PatientCreate createModel = new PatientCreate();
+	private string errorMessage;
+
+	private async Task HandleLogin()
+	{
+		try
+		{
+			await PatientService.AddPatientAsync(createModel);
+			Navigation.NavigateTo($"/login");
+
+		}
+		catch (Exception ex)
+		{
+			errorMessage = "Register failed: " + ex.Message;
+		}
+	}
+}

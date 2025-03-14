@@ -1,0 +1,254 @@
+﻿@page "/doctor/{doctorId:int}/create-prescription/{patientId:int}"
+@using HospitalPortal.WEB.Services
+@using HospitalPortal.WEB.Models
+@using System.Security.Claims
+@inject IPrescriptionService PrescriptionService
+@inject IMedicationService MedicationService
+@inject NavigationManager Navigation
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+<PageTitle>Create Prescription</PageTitle>
+
+<AuthorizeView Roles="Doctor" Context="authContext">
+	<Authorized>
+		@if (doctorId != Id)
+		{
+			<div class="no-access">
+				<p>You don't have access to this page.</p>
+			</div>
+		}
+		else
+		{
+			<div class="prescription-page">
+				<h1 class="page-title">Create Prescription</h1>
+				@if (prescriptionCreate != null && prescriptionCreate.Medications != null)
+				{
+					<EditForm Model="@prescriptionCreate" OnValidSubmit="SavePrescription" class="prescription-form">
+						<DataAnnotationsValidator />
+						<ValidationSummary />
+
+						<h2 class="section-title">Medications</h2>
+
+						@foreach (var medication in prescriptionCreate.Medications)
+						{
+							<div class="medication-card">
+								<div class="form-group">
+									<label>Medication</label>
+									<select class="form-control" @bind="medication.MedicationId">
+										<option value="">Select a medication</option>
+										@foreach (var med in medications)
+										{
+											<option value="@med.MedicationId">@med.MedicationName</option>
+										}
+									</select>
+								</div>
+								<div class="form-group">
+									<label>Dosage</label>
+									<input type="text" class="form-control" @bind="medication.Dosage" placeholder="e.g., 500mg twice daily" />
+								</div>
+								<div class="form-group">
+									<label>Instructions</label>
+									<textarea class="form-control" @bind="medication.Instructions" rows="3" placeholder="Enter specific instructions for the patient"></textarea>
+								</div>
+								<button type="button" class="btn btn-danger" @onclick="@(() => RemoveMedication(medication))">
+									<i class="icon">🗑️</i> Remove
+								</button>
+							</div>
+						}
+
+						<div class="form-actions">
+							<button type="button" class="btn btn-secondary" @onclick="AddMedication">
+								<i class="icon">➕</i> Add Medication
+							</button>
+							<button type="submit" class="btn btn-primary">
+								<i class="icon">💾</i> Save Prescription
+							</button>
+						</div>
+					</EditForm>
+				}
+			</div>
+		}
+	</Authorized>
+	<NotAuthorized>
+		<div class="no-access">
+			<p>You are not logged in as doctor.</p>
+		</div>
+	</NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+	[Parameter]
+	public int patientId { get; set; }
+	[Parameter]
+	public int doctorId { get; set; }
+	public PrescriptionCreate prescriptionCreate = new PrescriptionCreate();
+	public List<MedicationDto> medications = new List<MedicationDto>();
+	public int Id;
+	[CascadingParameter]
+	private Task<AuthenticationState> AuthState { get; set; }
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthState;
+		if (authState.User.Identity.IsAuthenticated)
+		{
+			var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+			if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+			{
+				Id = userId;
+			}
+		}
+		if (doctorId == Id)
+		{
+			medications = await MedicationService.GetMedicationsAsync();
+			prescriptionCreate.PatientId = patientId;
+			prescriptionCreate.DoctorId = doctorId;
+			prescriptionCreate.Medications = new List<MedicationCreate> { new MedicationCreate() };
+		}
+	}
+
+	private void AddMedication()
+	{
+		prescriptionCreate.Medications.Add(new MedicationCreate());
+	}
+
+	private void RemoveMedication(MedicationCreate medication)
+	{
+		prescriptionCreate.Medications.Remove(medication);
+	}
+
+	private async Task SavePrescription()
+	{
+		var result = await PrescriptionService.CreatePrescriptionAsync(prescriptionCreate);
+		if (result)
+		{
+			Navigation.NavigateTo($"/doctor/{doctorId}/appointments");
+		}
+	}
+}
+
+<style>
+	.no-access {
+		text-align: center;
+		font-size: 24px;
+		color: #ff4d4d;
+		margin-top: 20px;
+		font-weight: bold;
+	}
+
+	.prescription-page {
+		max-width: 800px;
+		margin: 0 auto;
+		padding: 2rem;
+		font-family: Arial, sans-serif;
+	}
+
+	.page-title {
+		color: #4A90E2;
+		text-align: center;
+		margin-bottom: 2rem;
+	}
+
+	.section-title {
+		color: #4A90E2;
+		font-size: 1.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.prescription-form {
+		background-color: #f9f9f9;
+		border-radius: 8px;
+		padding: 2rem;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	}
+
+	.medication-card {
+		background-color: white;
+		border: 1px solid #e0e0e0;
+		border-radius: 8px;
+		padding: 1.5rem;
+		margin-bottom: 1.5rem;
+		box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+	}
+
+	.form-group {
+		margin-bottom: 1rem;
+	}
+
+		.form-group label {
+			display: block;
+			margin-bottom: 0.5rem;
+			font-weight: bold;
+			color: #333;
+		}
+
+	.form-control {
+		width: 100%;
+		padding: 0.5rem;
+		border: 1px solid #ccc;
+		border-radius: 4px;
+		font-size: 1rem;
+	}
+
+	.form-actions {
+		display: flex;
+		justify-content: space-between;
+		margin-top: 2rem;
+	}
+
+	.btn {
+		padding: 0.7rem 1.5rem;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-size: 1rem;
+		font-weight: bold;
+		transition: background-color 0.3s ease;
+	}
+
+	.btn-primary {
+		background-color: #4A90E2;
+		color: white;
+	}
+
+		.btn-primary:hover {
+			background-color: #3570B2;
+		}
+
+	.btn-secondary {
+		background-color: #f0f0f0;
+		color: #333;
+	}
+
+		.btn-secondary:hover {
+			background-color: #e0e0e0;
+		}
+
+	.btn-danger {
+		background-color: #ff4d4d;
+		color: white;
+	}
+
+		.btn-danger:hover {
+			background-color: #e60000;
+		}
+
+	.icon {
+		margin-right: 0.5rem;
+	}
+
+	.prescription-form {
+		padding: 1rem;
+	}
+
+	.form-actions {
+		flex-direction: column;
+	}
+
+	.btn {
+		width: 100%;
+		margin-bottom: 1rem;
+	}
+
+	}
+</style>

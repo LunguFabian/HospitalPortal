@@ -1,0 +1,206 @@
+﻿@page "/doctor-profile/{doctorId:int}"
+@using HospitalPortal.WEB.Services
+@using HospitalPortal.WEB.Models
+@using System.Security.Claims
+@inject IDoctorService DoctorService
+@inject NavigationManager Navigation
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+<PageTitle>Patient Profile</PageTitle>
+<AuthorizeView Roles="Doctor">
+	<Authorized>
+		<div class="profile-container">
+			@if (doctorId != Id)
+			{
+				<div class="no-access">
+					<p>You don't have access to this page.</p>
+				</div>
+			}
+			else
+			{
+				<header class="profile-header">
+					<h1>My Profile</h1>
+				</header>
+				<main class="profile-content">
+					<div class="profile-card">
+						<div class="profile-avatar">
+							@(doctor.FirstName[0])@(doctor.LastName[0])
+						</div>
+						<div class="profile-details">
+							<h2>@doctor.FirstName @doctor.LastName</h2>
+							<p><strong>Email:</strong> @doctor.Email</p>
+							<p><strong>Specialization:</strong> @doctor.Specialization</p>
+						</div>
+					</div>
+
+					<div class="profile-actions">
+						<button class="btn btn-primary" @onclick="GoToAppointments">
+							<span class="icon">📅</span> My Appointments
+						</button>
+					</div>
+				</main>
+			}
+		</div>
+
+	</Authorized>
+	<NotAuthorized>
+		<div class="no-access">
+			<p>You are not logged in as doctor.</p>
+		</div>
+	</NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+	[Parameter]
+	public int doctorId { get; set; }
+
+	public DoctorDto? doctor;
+	public int Id;
+	[CascadingParameter]
+	private Task<AuthenticationState> AuthState { get; set; }
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthState;
+		if (authState.User.Identity.IsAuthenticated)
+		{
+			var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+			if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+			{
+				Id = userId;
+			}
+		}
+		if (Id == doctorId)
+		{
+			doctor = await DoctorService.GetDoctorByIdAsync(doctorId);
+		}
+	}
+
+	private void GoToAppointments()
+	{
+		Navigation.NavigateTo($"/doctor/{doctorId}/appointments");
+	}
+}
+
+<style>
+
+	.no-access {
+		text-align: center;
+		font-size: 24px;
+		color: #ff4d4d;
+		margin-top: 20px;
+		font-weight: bold;
+	}
+
+	.profile-container {
+		max-width: 800px;
+		margin: 0 auto;
+		padding: 2rem;
+		font-family: Arial, sans-serif;
+		color: #333;
+	}
+
+	.profile-header {
+		text-align: center;
+		margin-bottom: 2rem;
+	}
+
+		.profile-header h1 {
+			color: #4A90E2;
+			font-size: 2rem;
+		}
+
+	.loading-spinner {
+		text-align: center;
+		font-size: 1.2rem;
+		color: #666;
+	}
+
+	.profile-card {
+		display: flex;
+		align-items: center;
+		background-color: #f9f9f9;
+		border-radius: 8px;
+		padding: 2rem;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+		margin-bottom: 2rem;
+	}
+
+	.profile-avatar {
+		width: 100px;
+		height: 100px;
+		background-color: #4A90E2;
+		color: white;
+		font-size: 2.5rem;
+		font-weight: bold;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+		margin-right: 2rem;
+	}
+
+	.profile-details h2 {
+		color: #4A90E2;
+		margin-bottom: 1rem;
+	}
+
+	.profile-details p {
+		margin-bottom: 0.5rem;
+	}
+
+	.profile-actions {
+		display: flex;
+		justify-content: center;
+		gap: 1rem;
+	}
+
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		padding: 0.8rem 1.5rem;
+		font-size: 1rem;
+		font-weight: bold;
+		border-radius: 4px;
+		cursor: pointer;
+		transition: background-color 0.3s ease;
+		border: none;
+	}
+
+	.btn-primary {
+		background-color: #4A90E2;
+		color: white;
+	}
+
+		.btn-primary:hover {
+			background-color: #3570B2;
+		}
+
+	.btn-secondary {
+		background-color: #f0f0f0;
+		color: #333;
+	}
+
+		.btn-secondary:hover {
+			background-color: #e0e0e0;
+		}
+
+	.icon {
+		margin-right: 0.5rem;
+	}
+
+	.profile-avatar {
+		margin-right: 0;
+		margin-bottom: 1rem;
+	}
+
+	.profile-actions {
+		flex-direction: column;
+	}
+
+	.btn {
+		width: 100%;
+	}
+
+	}
+</style>

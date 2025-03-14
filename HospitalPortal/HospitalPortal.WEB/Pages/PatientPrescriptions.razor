@@ -1,0 +1,240 @@
+﻿@page "/patient/{patientId:int}/prescriptions"
+@using HospitalPortal.WEB.Models
+@using HospitalPortal.WEB.Services
+@using System.Globalization
+@using System.Security.Claims
+@inject IPrescriptionService PrescriptionService
+@inject NavigationManager Navigation
+
+
+<PageTitle>Prescriptions</PageTitle>
+<AuthorizeView Roles="Patient">
+	<Authorized>
+		<div class="prescription-page">
+			@if (patientId != Id)
+			{
+				<div class="no-access">
+					<p>You don't have access to this page.</p>
+				</div>
+			}
+			else if (prescriptions == null)
+			{
+				<div class="loading-spinner">Loading...</div>
+			}
+			else if (prescriptions.Count == 0)
+			{
+				<p class="no-prescriptions-text">You have no prescriptions.</p>
+			}
+			else
+			{
+				<h2 class="page-title">My Prescriptions</h2>
+				<div class="carousel">
+					<button class="carousel-button" @onclick="PreviousPrescription" disabled="@(currentIndex >= prescriptions.Count - 1)">
+						<span class="arrow">&#9664;</span>
+					</button>
+					<div class="prescription-container">
+						<div class="prescription-box">
+							<h3 class="prescription-title">Prescription for @prescriptions[currentIndex].PatientName</h3>
+							<div class="prescription-details">
+								<p><strong>Doctor:</strong> @prescriptions[currentIndex].DoctorName</p>
+								<p><strong>Date Created:</strong> @prescriptions[currentIndex].DateCreated.ToString("d MMMM, yyyy 'at' h:mm tt", new CultureInfo("en-GB"))</p>
+							</div>
+							<h4 class="medications-title">Medications:</h4>
+							<ul class="medications-list">
+								@foreach (var medication in prescriptions[currentIndex].Medications)
+								{
+									<li class="medication-item">
+										<span class="medication-name">@medication.MedicationName</span>
+										<span class="medication-dosage">Dosage: @medication.Dosage</span>
+										<span class="medication-instructions">Instructions: @medication.Instructions</span>
+									</li>
+								}
+							</ul>
+						</div>
+					</div>
+					<button class="carousel-button" @onclick="NextPrescription" disabled="@(currentIndex == 0)">
+						<span class="arrow">&#9654;</span>
+					</button>
+				</div>
+				<div class="prescription-counter">
+					Prescription @(prescriptions.Count - currentIndex) of @prescriptions.Count
+				</div>
+			}
+		</div>
+	</Authorized>
+	<NotAuthorized>
+		<div class="no-access">
+			<p>You are not logged in .</p>
+		</div>
+	</NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+	[Parameter]
+	public int patientId { get; set; }
+	private List<PrescriptionDto> prescriptions;
+	private int currentIndex;
+	public int Id;
+	[CascadingParameter]
+	private Task<AuthenticationState> AuthState { get; set; }
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthState;
+		if (authState.User.Identity.IsAuthenticated)
+		{
+			var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+			if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+			{
+				Id = userId;
+			}
+		}
+		if (Id == patientId)
+		{
+			prescriptions = await PrescriptionService.GetPrescriptionsByPatientIdAsync(patientId);
+			currentIndex = prescriptions?.Count - 1 ?? 0;
+		}
+	}
+
+	private void PreviousPrescription()
+	{
+		if (currentIndex < prescriptions.Count - 1)
+		{
+			currentIndex++;
+		}
+	}
+
+	private void NextPrescription()
+	{
+		if (currentIndex > 0)
+		{
+			currentIndex--;
+		}
+	}
+}
+
+<style>
+	.no-access {
+		text-align: center;
+		font-size: 24px;
+		color: #ff4d4d;
+		margin-top: 20px;
+		font-weight: bold;
+	}
+
+	.prescription-page {
+		max-width: 800px;
+		margin: 0 auto;
+		padding: 20px;
+		font-family: Arial, sans-serif;
+	}
+
+	.page-title {
+		text-align: center;
+		color: #333;
+		margin-bottom: 30px;
+	}
+
+	.loading-spinner {
+		text-align: center;
+		font-size: 18px;
+		color: #666;
+	}
+
+	.no-prescriptions-text {
+		text-align: center;
+		font-size: 18px;
+		color: #ff4d4d;
+		margin-top: 20px;
+	}
+
+	.carousel {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 20px;
+	}
+
+	.carousel-button {
+		background-color: #4A90E2;
+		color: white;
+		border: none;
+		padding: 10px 15px;
+		border-radius: 5px;
+		cursor: pointer;
+		transition: background-color 0.3s;
+	}
+
+		.carousel-button:hover:not(:disabled) {
+			background-color: #3570B2;
+		}
+
+		.carousel-button:disabled {
+			background-color: #ccc;
+			cursor: not-allowed;
+		}
+
+	.arrow {
+		font-size: 12px;
+	}
+
+	.prescription-container {
+		flex-grow: 1;
+		margin: 0 20px;
+	}
+
+	.prescription-box {
+		border: 1px solid #ccc;
+		padding: 20px;
+		border-radius: 5px;
+		background-color: #f9f9f9;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+	}
+
+	.prescription-title {
+		color: #4A90E2;
+		margin-top: 0;
+		margin-bottom: 15px;
+	}
+
+	.prescription-details {
+		margin-bottom: 15px;
+	}
+
+	.medications-title {
+		color: #333;
+		margin-bottom: 10px;
+	}
+
+	.medications-list {
+		list-style-type: none;
+		padding: 0;
+	}
+
+	.medication-item {
+		background-color: white;
+		border: 1px solid #e0e0e0;
+		border-radius: 3px;
+		padding: 10px;
+		margin-bottom: 10px;
+	}
+
+	.medication-name {
+		font-weight: bold;
+		color: #4A90E2;
+		display: block;
+		margin-bottom: 5px;
+	}
+
+	.medication-dosage, .medication-instructions {
+		display: block;
+		font-size: 0.9em;
+		color: #666;
+	}
+
+	.prescription-counter {
+		text-align: center;
+		font-size: 14px;
+		color: #666;
+	}
+</style>

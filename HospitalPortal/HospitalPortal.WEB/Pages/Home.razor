@@ -1,0 +1,109 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Web
+
+<PageTitle>Welcome to Hospital Portal</PageTitle>
+
+<div class="home-container">
+	<header class="home-header">
+		<h1>Welcome to Hospital Portal</h1>
+		<p class="subtitle">Your Gateway to Better Health Management</p>
+	</header>
+
+	<main class="home-content">
+		<section class="intro-section">
+			<p>Hospital Portal is designed to help you manage your healthcare needs with ease and confidence. Our secure platform puts you in control of your health journey.</p>
+		</section>
+
+		<section class="features-section">
+			<h2>What You Can Do Here</h2>
+			<div class="feature-grid">
+				<div class="feature-card">
+					<i class="feature-icon">👤</i>
+					<h3>Manage Your Profile</h3>
+					<p>Access your patient information securely.</p>
+				</div>
+				<div class="feature-card">
+					<i class="feature-icon">📅</i>
+					<h3>Schedule Appointments</h3>
+					<p>Book and review appointments with your healthcare providers.</p>
+				</div>
+				<div class="feature-card">
+					<i class="feature-icon">📋</i>
+					<h3>View Medical Records</h3>
+					<p>Access all of your prescription and keep track of them.</p>
+				</div>
+			</div>
+		</section>
+	</main>
+</div>
+
+<style>
+	.home-container {
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 2rem;
+		font-family: Arial, sans-serif;
+		color: #333;
+	}
+
+	.home-header {
+		text-align: center;
+		margin-bottom: 3rem;
+	}
+
+		.home-header h1 {
+			color: #4A90E2;
+			font-size: 2.5rem;
+			margin-bottom: 0.5rem;
+		}
+
+	.subtitle {
+		font-size: 1.2rem;
+		color: #666;
+	}
+
+	.intro-section {
+		text-align: center;
+		max-width: 800px;
+		margin: 0 auto 3rem;
+		font-size: 1.1rem;
+		line-height: 1.6;
+	}
+
+	.features-section h2 {
+		text-align: center;
+		color: #4A90E2;
+		margin-bottom: 2rem;
+	}
+
+	.feature-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+		gap: 2rem;
+		margin-bottom: 3rem;
+	}
+
+	.feature-card {
+		background-color: #f9f9f9;
+		border-radius: 8px;
+		padding: 1.5rem;
+		text-align: center;
+		box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+		transition: transform 0.3s ease;
+	}
+
+		.feature-card:hover {
+			transform: translateY(-5px);
+		}
+
+	.feature-icon {
+		font-size: 2.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.feature-card h3 {
+		color: #4A90E2;
+		margin-bottom: 0.5rem;
+	}
+
+</style>

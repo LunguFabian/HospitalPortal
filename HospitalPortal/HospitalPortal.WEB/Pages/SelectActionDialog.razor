@@ -1,0 +1,28 @@
+﻿@inject NavigationManager NavigationManager
+    
+<p>What do you want to do?</p>
+<button class="btn btn-primary" @onclick="NavigateToCreatePrescription">Create Prescription</button>
+<button class="btn btn-primary" @onclick="NavigateToViewDetails">View Prescriptions History</button>
+
+@code {
+    [Parameter]
+    public int DoctorId { get; set; }
+
+    [Parameter]
+    public int PatientId { get; set; }
+
+    [Parameter]
+    public DialogService DialogService { get; set; }
+
+    void NavigateToCreatePrescription()
+    {
+        NavigationManager.NavigateTo($"/doctor/{DoctorId}/create-prescription/{PatientId}");
+        DialogService.Close();
+    }
+
+    void NavigateToViewDetails()
+    {
+        NavigationManager.NavigateTo($"/patient/{PatientId}/doctor/{DoctorId}/history");
+        DialogService.Close();
+    }
+}

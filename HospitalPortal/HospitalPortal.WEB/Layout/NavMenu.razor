@@ -1,0 +1,104 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<div class="top-row ps-3 navbar navbar-dark">
+	<div class="container-fluid">
+		<a class="navbar-brand" href="">HospitalPortal</a>
+		<button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+			<span class="navbar-toggler-icon"></span>
+		</button>
+	</div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+	<nav class="flex-column">
+		<div class="nav-item px-3">
+			<NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+				<span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+			</NavLink>
+		</div>
+		<AuthorizeView Roles="Patient">
+			<Authorized>
+				<div class="nav-item px-3">
+					<NavLink class="nav-link" href="@($"/patient-profile/{Id}")" Match="NavLinkMatch.All">
+						<span class="icon" aria-hidden="true">👤</span> My Profile
+					</NavLink>
+				</div>
+				<div class="nav-item px-3">
+					<NavLink class="nav-link" href="@($"/patient/{Id}/appointments")" Match="NavLinkMatch.All">
+						<span class="icon" aria-hidden="true">📅</span> My Appointments
+					</NavLink>
+				</div>
+				<div class="nav-item px-3">
+					<NavLink class="nav-link" href="@($"/patient/{Id}/prescriptions")" Match="NavLinkMatch.All">
+						<span class="icon" aria-hidden="true">💊</span> My Prescriptions
+					</NavLink>
+				</div>
+			</Authorized>
+		</AuthorizeView>
+		<AuthorizeView Roles="Doctor">
+			<Authorized>
+				<div class="nav-item px-3">
+					<NavLink class="nav-link" href="@($"/doctor-profile/{Id}")" Match="NavLinkMatch.All">
+						<span class="icon" aria-hidden="true">👤</span> My Profile
+					</NavLink>
+				</div>
+				<div class="nav-item px-3">
+					<NavLink class="nav-link" href="@($"/doctor/{Id}/appointments")" Match="NavLinkMatch.All">
+						<span class="icon" aria-hidden="true">📅</span> My Appointments
+					</NavLink>
+				</div>
+			</Authorized>
+		</AuthorizeView>
+		<AuthorizeView>
+			<Authorized>
+				<div class="nav-item px-3">
+					<NavLink class="nav-link" href="#" @onclick="HandleLogout" style="color:red;font-size:17px">
+						<span aria-hidden="true">⬅️</span> Log Out
+					</NavLink>
+				</div>
+			</Authorized>
+			<NotAuthorized>
+				<div class="nav-item px-3">
+					<NavLink class="nav-link" href="login" style="color:greenyellow;font-size:17px">
+						<span aria-hidden="true">➡️</span> Log In
+					</NavLink>
+				</div>
+			</NotAuthorized>
+		</AuthorizeView>
+	</nav>
+</div>
+
+@code {
+	private bool collapseNavMenu = true;
+	private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+	[CascadingParameter]
+	private Task<AuthenticationState> AuthState { get; set; }
+
+	private void ToggleNavMenu()
+	{
+		collapseNavMenu = !collapseNavMenu;
+	}
+	private int? Id { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthState;
+		if (authState.User.Identity.IsAuthenticated)
+		{
+			var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+			if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+			{
+				Id = userId;
+			}
+		}
+	}
+	private async Task HandleLogout()
+	{
+		await ((CustomAuthStateProvider)AuthStateProvider).MarkUserAsLoggedOut();
+		NavigationManager.NavigateTo("/", true);
+	}
+}

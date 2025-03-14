@@ -1,0 +1,152 @@
+﻿@page "/doctor/{doctorId:int}/appointments"
+@using HospitalPortal.WEB.Services
+@using HospitalPortal.WEB.Models
+@using System.Globalization
+@using System.Security.Claims
+@inject DialogService DialogService
+@inject IAppointmentService AppointmentService
+@inject NavigationManager Navigation
+
+<PageTitle>Appointments</PageTitle>
+<AuthorizeView Roles="Doctor">
+	<Authorized>
+		@if (doctorId != Id)
+		{
+			<div class="no-access">
+				<p>You don't have access to this page.</p>
+			</div>
+		}
+		else if (appointmentDtos == null)
+		{
+			<div class="loading-spinner">Loading...</div>
+		}
+		else if (appointmentDtos.Count == 0)
+		{
+			<p class="no-appointments-text">You have 0 appointments made.</p>
+		}
+		else
+		{
+			<h3 class="e-title">Your Appointments</h3>
+			<p></p>
+			<RadzenScheduler @ref=@scheduler Culture=@(new CultureInfo("en-GB")) SlotRender=@OnSlotRender Style="height:475px"
+							 TItem="AppointmentCalendarModel" Data=@appointments StartProperty="Start" EndProperty="End"
+							 TextProperty="Text" SelectedIndex="1" AppointmentSelect=@OnAppointmentSelect>
+				<RadzenDayView EndTime=@TimeSpan.FromHours(16.00) />
+				<RadzenWeekView EndTime=@TimeSpan.FromHours(16.00) />
+			</RadzenScheduler>
+			<div class="scheduler-note">
+				<p><strong>Note:</strong> To create a prescription, click on the appointment of the respective patient.</p>
+			</div>
+		}
+	</Authorized>
+	<NotAuthorized>
+		<div class="no-access">
+			<p>You are not logged in as doctor.</p>
+		</div>
+	</NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+	[Parameter]
+	public int doctorId { get; set; }
+
+	private List<AppointmentDto> appointmentDtos;
+	public List<AppointmentCalendarModel> appointments = new List<AppointmentCalendarModel>();
+
+	RadzenScheduler<AppointmentCalendarModel> scheduler;
+
+	public int Id;
+	[CascadingParameter]
+	private Task<AuthenticationState> AuthState { get; set; }
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthState;
+		if (authState.User.Identity.IsAuthenticated)
+		{
+			var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+			if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+			{
+				Id = userId;
+			}
+		}
+		if (Id == doctorId)
+		{
+			appointmentDtos = await AppointmentService.GetAppointmentsByDoctorIdAsync(doctorId);
+			appointments = appointmentDtos.Select(app => new AppointmentCalendarModel
+				{
+					Start = app.DateAndHour,
+					End = app.DateAndHour.AddHours(1),
+					Text = $"{app.PatientName} - {app.StatusName}",
+					Id = app.PatientId
+				}).ToList();
+		}
+	}
+
+	void OnSlotRender(SchedulerSlotRenderEventArgs args)
+	{
+		if (args.View.Text == "Week" && args.Start.Date == DateTime.Today)
+		{
+			args.Attributes["style"] = "background:rgba(139, 203, 252, 0.3) ";
+		}
+		if ((args.View.Text == "Week" || args.View.Text == "Day") && (args.Start.DayOfWeek == DayOfWeek.Saturday || args.Start.DayOfWeek == DayOfWeek.Sunday))
+		{
+			args.Attributes["style"] = "background:rgba(150, 153, 152, 1) ";
+		}
+	}
+
+	async Task OnAppointmentSelect(SchedulerAppointmentSelectEventArgs<AppointmentCalendarModel> args)
+	{
+		if (args.Data != null)
+		{
+			var options = new DialogOptions { Width = "500px", Height = "200px" };
+
+			await DialogService.OpenAsync<SelectActionDialog>("Select Action", new Dictionary<string, object>
+		{
+			{ "DoctorId", doctorId },
+			{ "PatientId", args.Data.Id }
+		}, options);
+		}
+	}
+
+	/*async Task OnAppointmentSelect(SchedulerAppointmentSelectEventArgs<AppointmentCalendarModel> args)
+	{
+		Navigation.NavigateTo($"/doctor/{doctorId}/create-prescription/{args.Data.Id}");
+	}*/
+}
+
+<style>
+	.no-access {
+		text-align: center;
+		font-size: 24px;
+		color: #ff4d4d;
+		margin-top: 20px;
+		font-weight: bold;
+	}
+
+	.no-appointments-text {
+		text-align: center;
+		font-size: 18px;
+		color: #ff4d4d;
+		margin-top: 20px;
+	}
+
+	.make-appointment-button:hover {
+		background-color: green;
+		margin-bottom: 1000xp
+	}
+
+	.scheduler-note {
+		margin-top: 20px;
+		padding: 10px;
+		background-color: #f0f0f0;
+		border-radius: 5px;
+		text-align: center;
+	}
+
+		.scheduler-note p {
+			margin: 0;
+			color: #333;
+		}
+</style>
+

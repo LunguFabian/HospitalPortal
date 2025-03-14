@@ -1,0 +1,168 @@
+﻿@page "/patient/{patientId:int}/schedule"
+@using HospitalPortal.WEB.Services
+@using HospitalPortal.WEB.Models
+@using System.Globalization
+@using System.Security.Claims
+@inject IAppointmentService AppointmentService
+@inject IDoctorService DoctorService
+@inject NavigationManager Navigation
+@inject DialogService DialogService
+<PageTitle>Schedule Appointment</PageTitle>
+
+<AuthorizeView Roles="Patient">
+	<Authorized>
+		@if (patientId != Id)
+		{
+			<div class="no-access">
+				<p>You don't have access to this page.</p>
+			</div>
+		}
+		else
+		{
+			<h3 class="e-title">Schedule an Appointment</h3>
+
+			<div class="form-group">
+				<label for="doctorSelect">Select a Doctor:</label>
+				<select id="doctorSelect" class="form-control" @onchange="DoctorChanged">
+					<option value="">Select a Doctor</option>
+					@foreach (var doctor in doctors)
+					{
+						<option value="@doctor.Id">Dr.@doctor.FirstName @doctor.LastName-@doctor.Specialization</option>
+					}
+				</select>
+			</div>
+		}
+	</Authorized>
+	<NotAuthorized>
+		<div class="no-access">
+			<p>You are not logged in .</p>
+		</div>
+	</NotAuthorized>
+</AuthorizeView>
+
+
+@if (selectedDoctor != null)
+{
+	<RadzenScheduler Culture=@(new CultureInfo("en-GB")) @ref=@scheduler
+					 Style="height:475px" TItem="AppointmentCalendarModel"
+					 SlotRender=@OnSlotRender AppointmentRender=@OnAppointmentRender
+					 Data=@appointments StartProperty="Start" EndProperty="End"
+					 SlotSelect=@OnSlotSelect
+					 TextProperty="Text" SelectedIndex="1">
+		<RadzenDayView EndTime=@TimeSpan.FromHours(16.00) />
+		<RadzenWeekView EndTime=@TimeSpan.FromHours(16.00) />
+	</RadzenScheduler>
+}
+
+@code {
+
+	[Parameter] public int patientId { get; set; }
+
+	private List<DoctorDto> doctors = new List<DoctorDto>();
+	private DoctorDto? selectedDoctor;
+	private List<AppointmentDto> doctorAppointments;
+	private List<AppointmentCalendarModel> appointments = new List<AppointmentCalendarModel>();
+
+	RadzenScheduler<AppointmentCalendarModel> scheduler;
+
+	public int Id;
+	[CascadingParameter]
+	private Task<AuthenticationState> AuthState { get; set; }
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthState;
+		if (authState.User.Identity.IsAuthenticated)
+		{
+			var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+			if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+			{
+				Id = userId;
+			}
+		}
+		doctors = await DoctorService.GetDoctorsAsync();
+	}
+
+	private async Task DoctorChanged(ChangeEventArgs e)
+	{
+		var selectedDoctorId = int.Parse(e.Value.ToString());
+
+		if (selectedDoctorId != 0)
+		{
+			selectedDoctor = doctors.FirstOrDefault(d => d.Id == selectedDoctorId);
+
+			doctorAppointments = await AppointmentService.GetAppointmentsByDoctorIdAsync(selectedDoctorId);
+
+			appointments = doctorAppointments.Select(app => new AppointmentCalendarModel
+				{
+					Start = app.DateAndHour,
+					End = app.DateAndHour.AddHours(1),
+					Text = $"Occupied",
+					Id = app.Id
+				}).ToList();
+		}
+		else
+		{
+			selectedDoctor = null;
+			appointments.Clear();
+		}
+	}
+
+	void OnSlotRender(SchedulerSlotRenderEventArgs args)
+	{
+		if (args.View.Text == "Week" && args.Start.Date == DateTime.Today)
+		{
+			args.Attributes["style"] = "background:rgba(139, 203, 252, 0.3) ";
+		}
+		if ((args.View.Text == "Week" || args.View.Text == "Day") && (args.Start.DayOfWeek == DayOfWeek.Saturday || args.Start.DayOfWeek == DayOfWeek.Sunday))
+		{
+			args.Attributes["style"] = "background:rgba(150, 153, 152, 1) ";
+		}
+	}
+
+	void OnAppointmentRender(SchedulerAppointmentRenderEventArgs<AppointmentCalendarModel> args)
+	{
+		args.Attributes["style"] = "background-color: rgba(255, 0, 0, 1); color: white;";
+	}
+
+	async Task OnSlotSelect(SchedulerSlotSelectEventArgs args)
+	{
+		AppointmentCalendarModel data = await DialogService.OpenAsync<AddAppointmentPage>("Add Appointment",
+		new Dictionary<string, object> { { "Start", args.Start }, { "End", args.End } });
+
+		if (data != null)
+		{
+			AppointmentCreate createModel = new AppointmentCreate
+				{
+					DateAndHour = data.Start,
+					PatientId = patientId,
+					DoctorId = selectedDoctor.Id,
+					StatusId = 1
+				};
+			await AppointmentService.AddAppointment(createModel);
+			Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+		}
+	}
+
+
+}
+
+<style>
+	.no-access {
+		text-align: center;
+		font-size: 24px;
+		color: #ff4d4d;
+		margin-top: 20px;
+		font-weight: bold;
+	}
+
+	.form-group {
+		margin-bottom: 20px;
+	}
+
+	select {
+		width: 100%;
+		padding: 10px;
+		font-size: 16px;
+	}
+
+</style>

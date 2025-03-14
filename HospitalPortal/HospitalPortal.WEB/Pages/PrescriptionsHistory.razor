@@ -1,0 +1,94 @@
+﻿@page "/patient/{patientId:int}/doctor/{doctorId:int}/history"
+@using HospitalPortal.WEB.Models
+@using HospitalPortal.WEB.Services
+@using System.Globalization
+@using System.Security.Claims
+@inject IPrescriptionService PrescriptionService
+@inject NavigationManager Navigation
+
+<PageTitle>Patient Prescriptions</PageTitle>
+<AuthorizeView Roles="Doctor">
+	<Authorized>
+		@if (doctorId != Id)
+		{
+			<div class="no-access">
+				<p>You don't have access to this page.</p>
+			</div>
+		}
+		else if (prescriptions == null)
+		{
+			<p>Loading...</p>
+		}
+		else if (!prescriptions.Any())
+		{
+			<p>No prescriptions found for this patient and doctor.</p>
+		}
+		else
+		{
+			<h3>Prescriptions</h3>
+			<table class="table table-striped">
+				<thead>
+					<tr>
+						<th>Date of creation</th>
+						<th>Medication</th>
+						<th>Dosage</th>
+						<th>Instructions</th>
+					</tr>
+				</thead>
+				<tbody>
+					@foreach (var prescription in prescriptions.OrderByDescending(p => p.DateCreated))
+					{
+						<tr>
+							<td>@prescription.DateCreated.ToShortDateString()</td>
+							<td>@string.Join(", ", prescription.Medications.Select(m => m.MedicationName))</td>
+							<td>@string.Join(", ", prescription.Medications.Select(m => m.Dosage))</td>
+							<td>@string.Join(", ", prescription.Medications.Select(m => m.Instructions))</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		}
+	</Authorized>
+	<NotAuthorized>
+		<div class="no-access">
+			<p>You are not logged in .</p>
+		</div>
+	</NotAuthorized>
+</AuthorizeView>
+
+@code {
+	[Parameter]
+	public int patientId { get; set; }
+	[Parameter]
+	public int doctorId { get; set; }
+
+	private List<PrescriptionDto> prescriptions;
+	public int Id;
+	[CascadingParameter]
+	private Task<AuthenticationState> AuthState { get; set; }
+	protected override async Task OnInitializedAsync()
+	{
+		var authState = await AuthState;
+		if (authState.User.Identity.IsAuthenticated)
+		{
+			var userIdClaim = authState.User.FindFirst(ClaimTypes.NameIdentifier);
+			if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+			{
+				Id = userId;
+			}
+		}
+		if (Id == doctorId)
+		{
+			prescriptions = await PrescriptionService.GetPrescriptionsByPatientAndDoctorIdAsync(patientId, doctorId);
+		}
+	}
+}
+<style>
+	.no-access {
+		text-align: center;
+		font-size: 24px;
+		color: #ff4d4d;
+		margin-top: 20px;
+		font-weight: bold;
+	}
+</style>
